@@ -213,6 +213,7 @@ public static class Scorer
 
 public static class QueryEngine
 {
+    // brain behind queries, filters the database based on the chosen category
     public static void Run(List<Movie> movies)
     {
         // first we process genres
