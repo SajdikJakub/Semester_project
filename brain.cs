@@ -214,52 +214,91 @@ public static class Scorer
 public static class QueryEngine
 {
     public static void Run(List<Movie> movies)
-    // brain behind queries, filters the database based on the chosen category
     {
-        
-        List<string> questions = new List<string> {"Skip", "Longest movie", "Highest rated", "Newest movie", "Czech dub","Surprise me"};
-        for (int i = 0; i < questions.Count; i++) Console.WriteLine($"{i}. {questions[i]}");
-        
-        if (int.TryParse(Console.ReadLine(), out int answer))
-        {
-            switch (answer)
-            {
-                case 0:
-                    break;
-                case 1:
-                    var longest = movies.OrderByDescending(m => m.Runtime).First();
-                    Program.PrintMovie(longest);
-                    break;
-                case 2:
-                    var bestRated = movies.OrderByDescending(m => m.Rating).First();
-                    Program.PrintMovie(bestRated);
-                    break;
-                case 3:
-                    var newest = movies.OrderByDescending(m => m.Year).First();
-                    Program.PrintMovie(newest);
-                    break;
-                case 4:
-                    foreach (Movie m in movies)
-                    {
-                        if (m.HasCzechDub) Program.PrintMovie(m);
-                    }
-                    break;
-                case 5:
-                    var rng = new Random();
-                    int i = rng.Next(0, movies.Count);
-                    Program.PrintMovie(movies[i]);
-                    break;
-                default:
-                    Console.WriteLine("Invalid input");
-                    break;
+        // first we process genres
+        Console.WriteLine("Select genre (lowercase, comma-separated; leave blank to skip):");
+        var genreInput = Console.ReadLine();
+        List<string>? genres = null;
+        if (!string.IsNullOrWhiteSpace(genreInput))
+            genres = genreInput.Split(',').Select(g => g.Trim()).ToList();
 
-                    
-            }
-        }
-        else
+        // process year range now
+        Console.WriteLine("Select year range (YYYY-YYYY; leave blank to skip):");
+        
+        var yearInput = Console.ReadLine();
+        int yearMin = 0;
+        int yearMax = 0;
+        bool filterYear = false;
+        if (!string.IsNullOrWhiteSpace(yearInput))
         {
-            Console.WriteLine("Write a number");
+            var parts = yearInput.Split('-');
+            if (parts.Length == 2 && int.TryParse(parts[0], out yearMin) && int.TryParse(parts[1], out yearMax))
+                filterYear = true;
+            else
+                Console.WriteLine("Invalid format, skipping.");
         }
+
+        // now we process runtime range is similiar fashion
+        Console.WriteLine("Select rating range (e.g. 7.0-9.5; leave blank to skip):");
+
+        var ratingInput = Console.ReadLine();
+        double ratingMin = 0;
+        double ratingMax = 0;
+        bool filterRating = false;
+
+        if (!string.IsNullOrWhiteSpace(ratingInput))
+        {
+            var parts = ratingInput.Split('-');
+            if (parts.Length == 2 && double.TryParse(parts[0], out ratingMin) && double.TryParse(parts[1], out ratingMax))
+                filterRating = true;
+            else
+
+                Console.WriteLine("Invalid format, skipping.");
+        }
+
+        // runtime
+        Console.WriteLine("Select runtime range in minutes (e.g. 0-120; leave blank to skip):");
+        var runtimeInput = Console.ReadLine();
+        int runtimeMin = 0, runtimeMax = 0;
+        bool filterRuntime = false;
+        if (!string.IsNullOrWhiteSpace(runtimeInput))
+        {
+            var parts = runtimeInput.Split('-');
+            if (parts.Length == 2 && int.TryParse(parts[0], out runtimeMin) && int.TryParse(parts[1], out runtimeMax))
+                filterRuntime = true;
+            else
+                Console.WriteLine("Invalid format, skipping.");
+        }
+
+        // order
+        Console.WriteLine("Order by (name/year/rating/runtime; add R to reverse e.g. ratingR; leave blank to skip):");
+        var order = Console.ReadLine()?.Trim();
+
+
+        // now we filter based on the inputs from user
+        List<Movie> results = new List<Movie>(movies);
+        if (genres != null)   results = results.Where(m => genres.Contains(m.Genre.ToLower())).ToList();
+        if (filterYear)       results = results.Where(m => m.Year >= yearMin && m.Year <= yearMax).ToList();
+        if (filterRating)     results = results.Where(m => m.Rating >= ratingMin && m.Rating <= ratingMax).ToList();
+        if (filterRuntime)    results = results.Where(m => m.Runtime >= runtimeMin && m.Runtime <= runtimeMax).ToList();
+
+
+
+        // sort based on 'order' key from user
+        if (!string.IsNullOrWhiteSpace(order))
+        {
+            bool rev = order.EndsWith("R");
+            string key = order.TrimEnd('R').ToLower();
+            if (key == "name")    results = rev ? results.OrderByDescending(m => m.Name)    : results.OrderBy(m => m.Name);
+            if (key == "year")    results = rev ? results.OrderByDescending(m => m.Year)    : results.OrderBy(m => m.Year);
+            if (key == "rating")  results = rev ? results.OrderByDescending(m => m.Rating)  : results.OrderBy(m => m.Rating);
+            if (key == "runtime") results = rev ? results.OrderByDescending(m => m.Runtime) : results.OrderBy(m => m.Runtime);
+        }
+
+        // print if matches found, else just say nothing found.
+        var list = results.ToList();
+        if (list.Count == 0) Console.WriteLine("You are too hard on the filters, no matches found.");
+        else foreach (var m in list) Program.PrintMovie(m);
     }
 }
 
