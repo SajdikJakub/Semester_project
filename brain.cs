@@ -289,10 +289,10 @@ public static class QueryEngine
         {
             bool rev = order.EndsWith("R");
             string key = order.TrimEnd('R').ToLower();
-            if (key == "name")    results = rev ? results.OrderByDescending(m => m.Name)    : results.OrderBy(m => m.Name);
-            if (key == "year")    results = rev ? results.OrderByDescending(m => m.Year)    : results.OrderBy(m => m.Year);
-            if (key == "rating")  results = rev ? results.OrderByDescending(m => m.Rating)  : results.OrderBy(m => m.Rating);
-            if (key == "runtime") results = rev ? results.OrderByDescending(m => m.Runtime) : results.OrderBy(m => m.Runtime);
+            if (key == "name")    results = rev ? results.OrderByDescending(m => m.Name).ToList()    : results.OrderBy(m => m.Name).ToList();
+            if (key == "year")    results = rev ? results.OrderByDescending(m => m.Year).ToList()    : results.OrderBy(m => m.Year).ToList();
+            if (key == "rating")  results = rev ? results.OrderByDescending(m => m.Rating).ToList()  : results.OrderBy(m => m.Rating).ToList();
+            if (key == "runtime") results = rev ? results.OrderByDescending(m => m.Runtime).ToList() : results.OrderBy(m => m.Runtime).ToList();
         }
 
         // print if matches found, else just say nothing found.
