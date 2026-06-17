@@ -2,13 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
 public class Movie
 {
+    // Immutable record of a single movie loaded from the csv
     public string Name { get; init; }
     public string Genre { get; init; }
-    public int Year { get; init; } //year when the movie was released
-    public int Runtime { get; init; } //declared in minutes
+    public int Year { get; init; }
+    public int Runtime { get; init; } //in minutes
     public double Rating { get; init; } //6.7 for example
     public string Description { get; init; }
     public bool HasCzechDub { get; init; }
@@ -51,12 +51,14 @@ public static class CsvLoader
     }
     
     public static List<Movie> Load(string filePath)
-    //build the actual list of movies form data.csv
+    //build the actual list of movies form data.csv,
+    //we expect exactly 7 collumns in the correct order, Name, Genre, Year, Runtime, Rating, Description, HasCzechDub.
+    //there is no exception handling, we expect the csv table to be in a correct format
     {
         var movies = new List<Movie>();
         string[] lines = File.ReadAllLines(filePath);
 
-        for (int i = 1; i < lines.Length; i++)
+        for (int i = 1; i < lines.Length; i++) //we skip index , because thats the header of the table
         {
             List<string> f = ParseCsvLine(lines[i]);
 
@@ -80,6 +82,7 @@ public static class CsvLoader
 public class UserPreferences
 {
     // class where we store the user's preferences, we use null for invalid input
+    //or if any given field has no preferences
     public string? Genre { get; init; }
     public int? MinYear { get; init; } //from what year should the oldest films be
     public bool? PrefersShortFilm { get; init; }
@@ -92,7 +95,9 @@ public static class PreferencesCollector
 {
     public static UserPreferences Collect(List<Movie> movies)
     {
-        // first we create a list of all the distinct genres our csv table offers
+        // first we collect users preferences through the Console prompts
+        // genres are pulled dynamically from the movies we have loaded
+        // invalid or 'skip' answers become 'null'
         List<string> genres = new List<string>();
         foreach (Movie m in movies)
         {
@@ -106,6 +111,8 @@ public static class PreferencesCollector
         
         static int? AskNumber(string question, int min, int max)
         // helper function so that we dont need to rewrite this whole thing for each separate question
+        // '0' is being used for skip which is fine, because if we for example want a movie
+        // that has rating 0 or above, its all movies anyway, filter does not have to apply
         {
             Console.WriteLine(question);
             if (int.TryParse(Console.ReadLine(), out int response))
@@ -129,7 +136,8 @@ public static class PreferencesCollector
 
 
         static bool? AskYesNo(string question)
-        // same idea as with AskNumber but for bools
+        // takes bool prompts. y/yes/n/no in either lower or upper case is okay,
+        // any other input is 'null'
         {
             Console.WriteLine(question);
             string response = Console.ReadLine();
@@ -175,8 +183,12 @@ public static class PreferencesCollector
 
 public static class Scorer
 {
+    //returns top N movies that match our preferences the best
+    //we only take czech dub as a hard filter, otherwise we just dont add points,
+    //to keep as many movies in the database as possible. If a movie does not match one of our criteria but
+    //matches the rest perfectly, we shouldn't rule it out completely
+    // scoring signal is handled by the function ScoreMovie
     public static List<Movie> GetRecommendations(List<Movie> movies, UserPreferences prefs, int topN = 3)
-    // brain of the whole program, takes the whole list of movies and users preferences and retuns the best fits
     {
         List<Movie> candidates = new List<Movie>();
         if (prefs.HasCzechDub == true)
@@ -190,7 +202,7 @@ public static class Scorer
         }
         else candidates = movies;
 
-        // return top N movies ScoreMovie function returns
+        // sort the results high to low, return top N movies ScoreMovie function returns
         return candidates.OrderByDescending(movie => ScoreMovie(movie, prefs)).Take(topN).ToList();
 
         
@@ -198,14 +210,21 @@ public static class Scorer
 
     private static double ScoreMovie(Movie movie, UserPreferences prefs)
     {
+        //scores one movie at the time with our preferences. Higher the result, the better
+        //weights are tuned by hand, might need optimization later, genre currently dominates
+
         double sum = 0;
-        // I added weight as I saw them fit, might need a bit of tuning
         if (prefs.Genre != null && movie.Genre == prefs.Genre) sum += 40;
+        // genre is the strongest signal, if I want to watch some romantical stuff I dont want to see
+        // Dwayne the Rock Johnson fighting bunch of guys
         if (prefs.MinYear != null && movie.Year >= prefs.MinYear) sum += 10;
+        // released in / after is a small bonus, I'm fine with watching old classics
         if (prefs.MinRating != null && movie.Rating >= prefs.MinRating) sum += (movie.Rating - prefs.MinRating.Value)*10;
+        // we add bonus for rating dynanically, the hgiher it scores, the bigger bonus it schould get
         if (prefs.PrefersShortFilm == true && movie.Runtime < 90) sum += 20;
-        // add some randomness so that the program is not deterministic
+        // bonus for short films when the user prefers them.
         sum += new Random().NextDouble() * 5;
+        // add some randomness so that the program is not deterministic
         return sum;
     }
 }
@@ -213,17 +232,25 @@ public static class Scorer
 
 public static class QueryEngine
 {
-    // brain behind queries, filters the database based on the chosen category
+    // 'interacting with user' mode: asks the user for genre, year, rating,
+    // runtime and sort order, then filters the movie list and prints all the matches found.
+    // every filter is optional, if the input is blank or malformed,
+    // we skip it to not error out
     public static void Run(List<Movie> movies)
     {
-        // first we process genres
+        // every filter has the same structure: read input and if its not blank
+        // and valid, we set filter X flag + bounds. If not, just skip
+
+        // Genres - comma-separated list, case sensitiive
         Console.WriteLine("Select genre (lowercase, comma-separated; leave blank to skip):");
         var genreInput = Console.ReadLine();
         List<string>? genres = null;
         if (!string.IsNullOrWhiteSpace(genreInput))
             genres = genreInput.Split(',').Select(g => g.Trim()).ToList();
 
-        // process year range now
+
+
+        // year range - must be in format YYYY-YYYY, both bounds must be correct
         Console.WriteLine("Select year range (YYYY-YYYY; leave blank to skip):");
         
         var yearInput = Console.ReadLine();
@@ -239,7 +266,7 @@ public static class QueryEngine
                 Console.WriteLine("Invalid format, skipping.");
         }
 
-        // now we process runtime range is similiar fashion
+        // now we process rating range, we take doubles as a valid input, must be in format like this example: 7.0-9.5
         Console.WriteLine("Select rating range (e.g. 7.0-9.5; leave blank to skip):");
 
         var ratingInput = Console.ReadLine();
@@ -257,7 +284,7 @@ public static class QueryEngine
                 Console.WriteLine("Invalid format, skipping.");
         }
 
-        // runtime
+        // runtime range in minutes, in format 29-155 for example
         Console.WriteLine("Select runtime range in minutes (e.g. 0-120; leave blank to skip):");
         var runtimeInput = Console.ReadLine();
         int runtimeMin = 0, runtimeMax = 0;
@@ -271,7 +298,7 @@ public static class QueryEngine
                 Console.WriteLine("Invalid format, skipping.");
         }
 
-        // order
+        // order, this is our sort key, if there is an R in the end of users response, it means reversed (descending)
         Console.WriteLine("Order by (name/year/rating/runtime; add R to reverse e.g. ratingR; leave blank to skip):");
         var order = Console.ReadLine()?.Trim();
 
@@ -285,7 +312,7 @@ public static class QueryEngine
 
 
 
-        // sort based on 'order' key from user
+        // sort based on 'order' key from user ('R')
         if (!string.IsNullOrWhiteSpace(order))
         {
             bool rev = order.EndsWith("R");
@@ -307,8 +334,10 @@ public static class QueryEngine
 
 class Program{
 
+
     public static void PrintMovie(Movie m)
     {
+        //prints stuff about single movie in a readable format
         Console.WriteLine($"\n{m.Name} ({m.Year}) — {m.Genre} — {m.Runtime} min — {m.Rating}/10");
         Console.WriteLine($"Czech dub: {(m.HasCzechDub ? "Yes" : "No")}");
         Console.WriteLine(m.Description);
@@ -316,21 +345,26 @@ class Program{
 
     public static void Main(string[] args)
     {
+        //first it loads movie databse, then it lets user pick between recommendations mode and 
+        //query mode
         var movies = CsvLoader.Load("data.csv");
         
         Console.WriteLine("1. Get recommendations");
         Console.WriteLine("2. Query the database");
         
+
+        // we route to the chosen mode. if users does not input number or number out of range,
+        //return invalid input  
         if (int.TryParse(Console.ReadLine(), out int choice))
         {
             
             if (choice == 1)
                 {
-                            var prefs = PreferencesCollector.Collect(movies);
-                            var recommendations = Scorer.GetRecommendations(movies, prefs);
-
-                            Console.WriteLine("\n--- Tonight's picks ---");
-                            foreach (var m in recommendations) PrintMovie(m);
+                    var prefs = PreferencesCollector.Collect(movies);
+                    var recommendations = Scorer.GetRecommendations(movies, prefs);
+                    
+                    Console.WriteLine("\n--- Tonight's picks ---");
+                    foreach (var m in recommendations) PrintMovie(m);
                 }
             else if (choice == 2)
                 {
