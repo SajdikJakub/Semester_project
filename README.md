@@ -1,14 +1,24 @@
-Programming 2 Semester Project 
-My semester project is a console application in C# called What to Watch Tonight, 
-which recommends movies to the user based on their preferences. The program is working 
-with a CSV file containing information about films, such as title, genre, release year, 
-runtime, rating, and similar attributes. When the application starts, it will ask the user a 
-few optional questions, for example what genre they are in the mood for, whether they 
-want a shorter or longer film, or whether they prefer something newer or more highly rated. 
-Based on these preferences, the program will choose and display a small set of 
-recommended movies.
-There is also a query option for filtering the movies based on different criteria. 
-The main features I am implementing are loading and processing the CSV file, 
-representing movies as objects, collecting user preferences through the terminal, filtering 
-and scoring the available movies, and then showing the top recommendations. The recommendations also include a small amount of variability, so that the result is not 
-always exactly the same for the same input.
+What to watch tonight
+A console application in C# that recommends movies based on the user's
+preferences, or lets them query a movie database with custom filters.
+What it does?
+On start, the program loads a movie database from a CSV file and offers
+two modes:
+1. Recommendations: asks a few optional questions (genre, minimum
+   year, minimum rating, short vs. long, Czech dub only) and returns
+   top matches. Small amount of randomness is added so the same input
+   doesn't always produce the exact same answers.
+2. Query: filter the database manually by genre, year range, rating
+   range and runtime range, with possible sorting by any field.
+All preference questions are optional, leaving an answer blank (or
+entering `0` where prompted) skips that given filter.
+How to build and run?
+Run it from the project directory. 'data.csv' must be present in the
+working dir.
+Project structure:
+- 'Movie': immutable data model for one film
+- 'CsvLoader': reads and parses the CSV into 'Movie' objects
+- 'PreferencesCollector': gathers user preferences via console prompts
+- 'Scorer': scores movies against preferences, returns the top choices
+- 'QueryEngine': manual filtering / sorting mode
+- 'Program': entry point / menu
